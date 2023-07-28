@@ -1,0 +1,80 @@
+- name: Install required packages
+  apt:
+    name: ["ca-certificates", "curl", "apt-transport-https", "lsb-release", "gnupg"]
+    state: present
+  tags:
+    - azure_client
+
+- name: Create /etc/apt/keyrings directory
+  become: true
+  file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+  tags:
+    - azure_client
+
+- name: Download Microsoft GPG key
+  become: true
+  get_url:
+    url: https://packages.microsoft.com/keys/microsoft.asc
+    dest: /tmp/microsoft.asc
+  tags:
+    - azure_client
+
+- name: Import Microsoft GPG key
+  become: true
+  shell: "gpg --dearmor < /tmp/microsoft.asc | sudo tee /etc/apt/keyrings/microsoft.gpg" 
+  tags:
+    - azure_client
+
+- name: Change permissions on Microsoft GPG key file
+  become: true
+  file:
+    path: /etc/apt/keyrings/microsoft.gpg
+    mode: '0644'
+  tags:
+    - azure_client
+
+- name: Get AZ_REPO
+  become: true
+  shell: lsb_release -cs
+  register: az_repo_result
+  tags:
+    - azure_client
+
+- name: Create /etc/apt/sources.list directory if it does not exist
+  become: true
+  file:
+    path: /etc/apt/sources.list.d
+    state: directory
+    mode: '0755'
+  tags:
+    - azure_client
+
+- name: Create /etc/apt/sources.list.d/azure-cli.list if it does not exist
+  become: true
+  file:
+    path: /etc/apt/sources.list.d/azure-cli.list
+    state: touch
+    mode: '0644'
+  tags:
+    - azure_client
+
+- name: Add Azure CLI repository to sources.list.d
+  become: true
+  lineinfile:
+    path: /etc/apt/sources.list.d/azure-cli.list
+    line: "deb [arch={{ ansible_architecture }} signed-by=/etc/apt/keyrings/microsoft.gpg] https://packages.microsoft.com/repos/azure-cli/ {{ az_repo_result.stdout }} main"
+    state: present
+  tags:
+    - azure_client
+
+- name: Finally install the azure_client packages
+  become: true
+  apt:
+    name: azure-cli
+    state: present
+    update_cache: yes
+  tags:
+    - azure_client
